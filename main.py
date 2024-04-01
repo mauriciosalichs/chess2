@@ -79,10 +79,7 @@ while running:
             y2 = int(y2/size)
             if (x2,y2) in allowed_movements(selected_piece):
                 # White plays the chosen movement
-                selected_piece.position = (x2,y2)
-                calculate_damage(x2,y2)
-                board[x2][y2] = selected_piece
-                board[x1][y1] = None
+                accept_movement(selected_piece,x2,y2)
                 # Now black plays
                 black_plays_random()
             else:

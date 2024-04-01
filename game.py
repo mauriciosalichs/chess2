@@ -71,7 +71,7 @@ for piece in white_pieces+black_pieces:
     (i,j) = piece.position
     board[i][j] = piece
 
-# Movements related functions
+# Allowed movements related functions
 
 def explore(player_color, rangeX=None,rangeY=None,v=None):
     ans = []
@@ -149,17 +149,7 @@ def allowed_movements(piece):
     return ans
 
 
-# Actions related functions
-
-def calc_moves():
-    acc = 0
-    print()
-    for piece in white_pieces:
-        mov = allowed_movements(piece)
-        print(piece,mov)
-        acc += len(mov)
-    print(f"Hay {acc} movimientos posibles.")
-    
+# Calculating opponent movements
 
 def calculate_black_play(piece, move, board, wpieces, bpieces, gen):
     if gen == 0:
@@ -208,29 +198,23 @@ def black_plays(): # Trying to pick the best movement (doesnt work)
     
     (sel_piece, (x2,y2)) = ans
     print(f"\nFrom {acc} possibilites, black plays {sel_piece} to ({x2},{y2})")
-    (x1,y1) = sel_piece.position
-    sel_piece.position = (x2,y2)
-    calculate_damage(x2,y2)
-    board[x2][y2] = sel_piece
-    board[x1][y1] = None
+    accept_movement(sel_piece,x2,y2)
 
 def black_plays_random(): # Just plays a Random movement
     possible_moves = []
     for piece in black_pieces:
         for move in allowed_movements(piece):
             possible_moves.append((piece,move))
-    sel_move = choice(possible_moves)
-    (sel_piece, (x2,y2)) = sel_move
-    print(f"\nFrom {len(possible_moves)} possibilites, black plays {sel_piece} to ({x2},{y2})")
-    
-    (x1,y1) = sel_piece.position
-    sel_piece.position = (x2,y2)
-    calculate_damage(x2,y2)
-    board[x2][y2] = sel_piece
-    board[x1][y1] = None
+    (sel_piece, (x2,y2)) = choice(possible_moves)
+    print(f"\nFrom {len(possible_moves)} possibilites, black plays {sel_piece} to ({x2},{y2})")   
+    accept_movement(sel_piece,x2,y2)
 
-def calculate_damage(x2,y2):
-    piece = board[x2][y2]
-    if piece:
-        damaged = white_pieces if piece.color == 'w' else black_pieces
-        damaged.remove(piece)
+def accept_movement(piece,x2,y2):
+    (x1,y1) = piece.position
+    piece.position = (x2,y2)
+    board[x1][y1] = None
+    eaten_piece = board[x2][y2]
+    if eaten_piece:
+        damaged = white_pieces if piece.color == 'b' else black_pieces
+        damaged.remove(eaten_piece)
+    board[x2][y2] = piece
