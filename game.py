@@ -12,6 +12,7 @@ class GameState:
             cls._instance.white_pieces = white_pieces
             cls._instance.black_pieces = black_pieces
             cls._instance.current_player = 'w'
+            cls._instance.last_moved = None
             cls._instance.white_in_check = False
             cls._instance.black_in_check = False
             cls._instance.white_castling_left = True
@@ -20,14 +21,6 @@ class GameState:
             cls._instance.black_castling_right = True
             cls._instance.ending = None
         return cls._instance
-        
-    def check_cell(self, x, y, c):
-        if x > 7 or x < 0 or y > 7 or y < 0:
-            return 'forb'
-        if self.board[x][y] == None:
-            return 'cont'
-        else:
-            return 'forb' if self.board[x][y].color == c else 'stop'
 
 
 white_pieces = []
@@ -73,12 +66,20 @@ for piece in white_pieces+black_pieces:
 
 # Allowed movements related functions
 
-def explore(player_color, rangeX=None,rangeY=None,v=None):
+def check_cell(board, x, y, c):
+    if x > 7 or x < 0 or y > 7 or y < 0:
+        return 'forb'
+    if board[x][y] == None:
+        return 'cont'
+    else:
+        return 'forb' if board[x][y].color == c else 'stop'
+            
+def explore(board, player_color, rangeX=None,rangeY=None,v=None):
     ans = []
     rangeX = [v]*len(rangeY) if rangeX == None else rangeX
     rangeY = [v]*len(rangeX) if rangeY == None else rangeY
     for (i,j) in zip(rangeX,rangeY):
-        action = GameState().check_cell(i, j, player_color)
+        action = check_cell(board, i, j, player_color)
         if action == 'cont':
             ans.append((i,j))
         elif action == 'stop':
@@ -88,122 +89,120 @@ def explore(player_color, rangeX=None,rangeY=None,v=None):
             break
     return ans
 
-def pawn_moves(x, y, player_color):
+def pawn_moves(board, x, y, player_color):
     ans = []
     adv = -1 if player_color == 'w' else 1
-    if GameState().check_cell(x  ,y+adv,player_color) == 'cont': ans.append((x  ,y+adv))
-    if GameState().check_cell(x-1,y+adv,player_color) == 'stop': ans.append((x-1,y+adv))
-    if GameState().check_cell(x+1,y+adv,player_color) == 'stop': ans.append((x+1,y+adv))
+    if check_cell(board, x  ,y+adv,player_color) == 'cont': ans.append((x  ,y+adv))
+    if check_cell(board, x-1,y+adv,player_color) == 'stop': ans.append((x-1,y+adv))
+    if check_cell(board, x+1,y+adv,player_color) == 'stop': ans.append((x+1,y+adv))
     
     if player_color == 'w' and y == 6 and board[x][4]==None and board[x][5]==None: ans.append((x,4))
     if player_color == 'b' and y == 1 and board[x][2]==None and board[x][3]==None: ans.append((x,3))
     
     return ans
 
-def king_moves(x, y, player_color):
+def king_moves(board, x, y, player_color):
     ans = []
     for (i,j) in [(x-1,y-1), (x-1,y), (x-1,y+1), (x,y-1), (x,y+1), (x+1,y-1), (x+1,y), (x+1,y+1)]:
-        if GameState().check_cell(i, j, player_color) != 'forb': ans.append((i,j))
+        if check_cell(board, i, j, player_color) != 'forb': ans.append((i,j))
     # Agregar Enroques
     return ans
 
-def knight_moves(x, y, player_color):
+def knight_moves(board, x, y, player_color):
     ans = []
     for (i,j) in [(x-2,y-1), (x-2,y+1), (x-1,y-2), (x-1,y+2), (x+1,y-2), (x+1,y+2), (x+2,y-1), (x+2,y+1)]:
-        if GameState().check_cell(i, j, player_color) != 'forb': ans.append((i,j))
+        if check_cell(board, i, j, player_color) != 'forb': ans.append((i,j))
     return ans
     
-def cross_moves(x, y, player_color):
+def cross_moves(board, x, y, player_color):
     ans = []
-    ans += explore(player_color,rangeX=range(x-1,-1,-1),v=y)
-    ans += explore(player_color,rangeX=range(x+1,8),v=y)
-    ans += explore(player_color,rangeY=range(y-1,-1,-1),v=x)
-    ans += explore(player_color,rangeY=range(y+1,8),v=x)
+    ans += explore(board, player_color,rangeX=range(x-1,-1,-1),v=y)
+    ans += explore(board, player_color,rangeX=range(x+1,8),v=y)
+    ans += explore(board, player_color,rangeY=range(y-1,-1,-1),v=x)
+    ans += explore(board, player_color,rangeY=range(y+1,8),v=x)
     return ans
     
-def diag_moves(x, y, player_color):
+def diag_moves(board, x, y, player_color):
     ans = []
-    ans += explore(player_color,rangeX=range(x-1,-1,-1),rangeY=range(y-1,-1,-1))
-    ans += explore(player_color,rangeX=range(x+1,8),rangeY=range(y+1,8))
-    ans += explore(player_color,rangeX=range(x-1,-1,-1),rangeY=range(y+1,8))
-    ans += explore(player_color,rangeX=range(x+1,8),rangeY=range(y-1,-1,-1))
+    ans += explore(board, player_color,rangeX=range(x-1,-1,-1),rangeY=range(y-1,-1,-1))
+    ans += explore(board, player_color,rangeX=range(x+1,8),rangeY=range(y+1,8))
+    ans += explore(board, player_color,rangeX=range(x-1,-1,-1),rangeY=range(y+1,8))
+    ans += explore(board, player_color,rangeX=range(x+1,8),rangeY=range(y-1,-1,-1))
     return ans
     
-def allowed_movements(piece):
+def allowed_movements(board, piece):
     ans = []
     (x, y) = piece.position
     player_color = piece.color
     if piece.piece_type == PieceType.PAWN:
-        ans += pawn_moves(x, y, player_color)
+        ans += pawn_moves(board, x, y, player_color)
     elif piece.piece_type == PieceType.ROOK:
-        ans += cross_moves(x, y, player_color)
+        ans += cross_moves(board, x, y, player_color)
     elif piece.piece_type == PieceType.KNIGHT:
-        ans += knight_moves(x, y, player_color)
+        ans += knight_moves(board, x, y, player_color)
     elif piece.piece_type == PieceType.BISHOP:
-        ans += diag_moves(x, y, player_color)
+        ans += diag_moves(board, x, y, player_color)
     elif piece.piece_type == PieceType.QUEEN:
-        ans += cross_moves(x, y, player_color)
-        ans += diag_moves(x, y, player_color)
+        ans += cross_moves(board, x, y, player_color)
+        ans += diag_moves(board, x, y, player_color)
     elif piece.piece_type == PieceType.KING:
-        ans += king_moves(x, y, player_color)
+        ans += king_moves(board, x, y, player_color)
     return ans
 
 
 # Calculating opponent movements
 
-def calculate_black_play(piece, move, board, wpieces, bpieces, gen):
+def predict_best_movement(board, piece, move, gen):
     if gen == 0:
         return 0
-    if gen % 2 == 0:
-        player_pieces, opp_pieces, plus = bpieces, wpieces, 1
+    if gen % 2 == 1:
+        opp, plus, opt = 'w',  1, min
     else:
-        player_pieces, opp_pieces, plus = wpieces, bpieces, -1
-    
+        opp, plus, opt = 'b', -1, max
+        
+    board_ = np.copy(board)
     (i,j) = piece.position
     (k,l) = move
-    eaten_piece = board[k][l]
+    eaten_piece = board_[k][l]
     if eaten_piece:
         value = plus*eaten_piece.value
-        for p in opp_pieces:
-            if p.position == (k,l): opp_pieces.remove(p)
-        
     else:
         value = 0
-    board[i][j] = None
-    board[k][l] = piece
-    for p in player_pieces:
-        if p.position == (i,j): p.position = (k,l)
-    vals = []
-    for piece_ in opp_pieces:
-        for move_ in allowed_movements(piece_):
-            vals.append(calculate_black_play(piece_, move_, board, wpieces, bpieces, gen - 1) + value)
-    if vals:
-        return max(vals) if gen % 2 == 0 else min(vals)
-    else:
-        return 0
+    board_[i][j] = None
+    board_[k][l] = piece
+    
+    next_moves = []
+    for i in range(8):
+        for j in range(8):
+            piece_ = board_[i][j]
+            if piece_ and piece_.color == opp:
+                for move_ in allowed_movements(board_, piece_):
+                    prediction = predict_best_movement(board_, piece_, move_, gen - 1)
+                    next_moves.append(prediction)
+    return opt(next_moves) + value
 
 
-def black_plays(): # Trying to pick the best movement (doesnt work)
+def black_plays(): # Trying to pick the best movement
     val = -99999
-    ans = None
+    ans = []
     acc = 0
     for piece in black_pieces:
-        for move in allowed_movements(piece):
+        for move in allowed_movements(board, piece):
             acc+=1
-            val_ = calculate_black_play(piece, move, np.copy(board), deepcopy(white_pieces), deepcopy(black_pieces), 2)
-            #print(f"Move {piece} to {move}...gets {val_} points")
+            val_ = predict_best_movement(board, piece, move, 3)
             if val_ > val:
-                ans = (piece, move)
+                ans = [(piece, move)]
                 val = val_
-    
-    (sel_piece, (x2,y2)) = ans
+            elif val_ == val:
+                ans.append((piece, move))
+    (sel_piece, (x2,y2)) = choice(ans)
     print(f"\nFrom {acc} possibilites, black plays {sel_piece} to ({x2},{y2})")
     accept_movement(sel_piece,x2,y2)
 
 def black_plays_random(): # Just plays a Random movement
     possible_moves = []
     for piece in black_pieces:
-        for move in allowed_movements(piece):
+        for move in allowed_movements(board, piece):
             possible_moves.append((piece,move))
     (sel_piece, (x2,y2)) = choice(possible_moves)
     print(f"\nFrom {len(possible_moves)} possibilites, black plays {sel_piece} to ({x2},{y2})")   
@@ -218,3 +217,4 @@ def accept_movement(piece,x2,y2):
         damaged = white_pieces if piece.color == 'b' else black_pieces
         damaged.remove(eaten_piece)
     board[x2][y2] = piece
+    GameState().last_moved = (piece,x1,y1,x2,y2)
