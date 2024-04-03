@@ -21,7 +21,13 @@ def draw_board(mx = -100, my = -100):
     white_cell = True
     for i in range(8):
         for j in range(8):
-            if white_cell:
+            if GameState().white_in_check and (i,j) == GameState().white_king_pos:
+                color = (255,100,100)
+            elif GameState().black_in_check and (i,j) == GameState().black_king_pos:
+                color = (255,100,100)
+            elif (i,j) in ok_moves:
+                color = (100*white_cell,155,100*white_cell)
+            elif white_cell:
                 color = (200,200,200)
             else:
                 color = (100,100,100)
@@ -62,9 +68,18 @@ def draw_animation(length):
             sleep(0.1/length)
         selected_piece = None
     
+def draw_info_column(piece):
+    i = 0
+    screen.fill((0,0,0))
+    for info_move in calc_moves_piece(piece):
+        info_text = small_font.render(info_move, True, (255,255,255))
+        screen.blit(info_text, (825, 100+i*30))
+        i+=1
+
 def reset_variables():
-    global action_started, selected_piece, x, y
+    global action_started, ok_moves, selected_piece, x, y
     action_started = False
+    ok_moves = []
     x, y = -100, -100
     selected_piece = None
 
@@ -98,16 +113,17 @@ while running:
                 selected_piece = board[x1][y1]
                 if selected_piece and selected_piece.color == 'w':
                    action_started = True
-                   #print('\n',selected_piece,allowed_movements(selected_piece))
+                   ok_moves = allowed_movements(board, selected_piece)
+                   #draw_info_column(selected_piece)
             elif action_started and event.type == pygame.MOUSEBUTTONUP:
                 x2, y2 = event.pos
                 x2 = int(x2/size)
                 y2 = int(y2/size)
-                if (x2,y2) in allowed_movements(board, selected_piece):
+                if (x2,y2) in ok_moves:
                     # White plays the chosen movement
                     accept_movement(selected_piece,x2,y2)
                     # Now black plays
-                    waiting_opp = threading.Thread(target=black_plays)
+                    waiting_opp = threading.Thread(target=black_auto_play)
                     waiting_opp.start()
                     waiting_opponent = True
                 else:

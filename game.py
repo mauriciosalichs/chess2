@@ -11,7 +11,10 @@ class GameState:
             cls._instance.board = board
             cls._instance.white_pieces = white_pieces
             cls._instance.black_pieces = black_pieces
+            cls._instance.white_king_pos = white_king_pos
+            cls._instance.black_king_pos = black_king_pos
             cls._instance.current_player = 'w'
+            cls._instance.ok_moves = []
             cls._instance.last_moved = None
             cls._instance.white_in_check = False
             cls._instance.black_in_check = False
@@ -63,6 +66,9 @@ board = np.full((8,8), None)
 for piece in white_pieces+black_pieces:
     (i,j) = piece.position
     board[i][j] = piece
+    if piece.piece_type == PieceType.KING:
+        if piece.color == 'w': white_king_pos = piece.position
+        elif piece.color == 'b': black_king_pos = piece.position
 
 # Allowed movements related functions
 
@@ -130,7 +136,7 @@ def diag_moves(board, x, y, player_color):
     ans += explore(board, player_color,rangeX=range(x+1,8),rangeY=range(y-1,-1,-1))
     return ans
     
-def allowed_movements(board, piece):
+def allowed_movements(board, piece, discard_mates=True):
     ans = []
     (x, y) = piece.position
     player_color = piece.color
@@ -147,7 +153,28 @@ def allowed_movements(board, piece):
         ans += diag_moves(board, x, y, player_color)
     elif piece.piece_type == PieceType.KING:
         ans += king_moves(board, x, y, player_color)
-    return ans
+        
+    if discard_mates:
+        def_ans= []
+        for (x2,y2) in ans:
+            safe_move = True
+            board_ = np.copy(board)
+            board_[x][y] = None
+            eaten_piece = board[x2][y2]
+            board_[x2][y2] = piece
+            wkp = (x2,y2) if piece.piece_type == PieceType.KING and piece.color == 'w' else white_king_pos
+            bkp = (x2,y2) if piece.piece_type == PieceType.KING and piece.color == 'b' else black_king_pos
+            for piece_ in (black_pieces if player_color == 'w' else white_pieces):
+                if piece_ == eaten_piece:
+                    continue
+                if (wkp if player_color == 'w' else bkp) in allowed_movements(board_, piece_, False):
+                    safe_move = False
+                    break
+            if safe_move:
+                def_ans.append((x2,y2))
+        return def_ans
+    else:
+        return ans
 
 
 # Calculating opponent movements
@@ -176,17 +203,17 @@ def predict_best_movement(board, piece, move, gen):
         for j in range(8):
             piece_ = board_[i][j]
             if piece_ and piece_.color == opp:
-                for move_ in allowed_movements(board_, piece_):
+                for move_ in allowed_movements(board_, piece_, False):
                     prediction = predict_best_movement(board_, piece_, move_, gen - 1)
                     next_moves.append(prediction)
     return opt(next_moves) + value
 
 
-def black_plays(): # Trying to pick the best movement
+def auto_play(pieces, just_calculate): # Trying to pick the best movement
     val = -99999
     ans = []
     acc = 0
-    for piece in black_pieces:
+    for piece in pieces:
         for move in allowed_movements(board, piece):
             acc+=1
             val_ = predict_best_movement(board, piece, move, 3)
@@ -195,9 +222,27 @@ def black_plays(): # Trying to pick the best movement
                 val = val_
             elif val_ == val:
                 ans.append((piece, move))
-    (sel_piece, (x2,y2)) = choice(ans)
-    print(f"\nFrom {acc} possibilites, black plays {sel_piece} to ({x2},{y2})")
-    accept_movement(sel_piece,x2,y2)
+            if just_calculate:
+                print(f"Playing {piece} to {move} gives {val_} points.")
+    
+    if not just_calculate:
+        (sel_piece, (x2,y2)) = choice(ans)
+        team = 'black' if sel_piece.color == 'b' else 'white'
+        print(f"\nFrom {acc} possibilites, {team} plays {sel_piece} to ({x2},{y2})")
+        accept_movement(sel_piece,x2,y2)
+        
+def black_auto_play():
+    auto_play(black_pieces, False)
+    
+def white_calc_play():
+    auto_play(white_pieces, True)
+    
+def calc_moves_piece(piece):
+    info = []
+    for move in allowed_movements(board, piece):
+        val = predict_best_movement(board, piece, move, 3)
+        info.append(f"Moving {piece} to {move} gives {val} points.")
+    return info
 
 def black_plays_random(): # Just plays a Random movement
     possible_moves = []
@@ -205,7 +250,7 @@ def black_plays_random(): # Just plays a Random movement
         for move in allowed_movements(board, piece):
             possible_moves.append((piece,move))
     (sel_piece, (x2,y2)) = choice(possible_moves)
-    print(f"\nFrom {len(possible_moves)} possibilites, black plays {sel_piece} to ({x2},{y2})")   
+    print(f"\nFrom {len(possible_moves)} possibilites, black randomly plays {sel_piece} to ({x2},{y2})")   
     accept_movement(sel_piece,x2,y2)
 
 def accept_movement(piece,x2,y2):
@@ -218,3 +263,27 @@ def accept_movement(piece,x2,y2):
         damaged.remove(eaten_piece)
     board[x2][y2] = piece
     GameState().last_moved = (piece,x1,y1,x2,y2)
+    
+    if piece.color == 'w':
+        if piece.piece_type == PieceType.PAWN and y2 == 0:
+            piece.piece_type = PieceType.QUEEN
+        if piece.piece_type == PieceType.KING:
+            GameState().white_king_pos = (x2,y2)
+        # ...
+        for piece_ in white_pieces:
+            if GameState().black_king_pos in allowed_movements(board, piece_):
+                GameState().black_in_check = True
+                break
+        GameState().white_in_check = False
+    else:
+        if piece.piece_type == PieceType.PAWN and y2 == 7:
+            piece.piece_type = PieceType.QUEEN
+        if piece.piece_type == PieceType.KING:
+            GameState().black_king_pos = (x2,y2)
+        # ...
+        for piece_ in black_pieces:
+            if GameState().white_king_pos in allowed_movements(board, piece_):
+                GameState().white_in_check = True
+                break
+        GameState().black_in_check = False
+
